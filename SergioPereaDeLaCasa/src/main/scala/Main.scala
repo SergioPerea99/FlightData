@@ -1,11 +1,14 @@
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{Dataset, SparkSession}
-import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.{Column, DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.functions._
+
+import java.io.{BufferedWriter, FileWriter}
 
 object Main {
 
   def main(args: Array[String]): Unit = {
 
+    //Spark setup and load the DF
     manageSparkOutputs()
 
     val spark = SparkSession.builder.appName("Flight Data Assignment").master("local").getOrCreate()
@@ -13,6 +16,10 @@ object Main {
     showComponentVersions(spark.version)
 
     val (flightData, passengerData) = loadDataFrames(spark)
+
+    //Question 1: Find the total number of flights for each month.
+    groupFlightsByDate(dataFrame = flightData, groupByFunction = month(col("date")), groupName = "Month")
+
 
     spark.stop()
   }
@@ -84,5 +91,40 @@ object Main {
     (flightData, passengerData)
   }
 
+  /**
+   * Generic method to group flights by a date criterion (month, year, day, etc.)
+   * @param flightData Dataset[FlightData] Dataset of flight data
+   * @param groupByFunction Grouping function for the date column (month, year, day, etc.)
+   * @param groupName Name of the group (e.g., ‘Month’, ‘Year’, etc.)
+   * @return DataFrame with the total number of flights grouped by the selected criterion
+   */
+  private def groupFlightsByDate(dataFrame: Dataset[FlightData], groupByFunction: => Column, groupName: String): Unit = {
+    val groupedData = dataFrame.groupBy(groupByFunction.as(groupName))
+      .agg(count("flightId").as("Number of Flights"))
+      .orderBy(groupName)
+
+    saveDataFrameAsCSV(groupedData, "../question1.csv")
+  }
+
+
+  /**
+   * Method to save any DataFrame to a CSV file.
+   *
+   * @param dataFrame The DataFrame to save.
+   * @param outputPath The path where the CSV file will be saved.
+   */
+  private def saveDataFrameAsCSV(dataFrame: DataFrame, outputPath: String): Unit = {
+
+    val header = dataFrame.columns.mkString(";")
+    val rows = dataFrame.collect().map(row => row.toSeq.map(_.toString).toArray)
+    val file = new BufferedWriter(new FileWriter(outputPath))
+    file.write(header)
+    file.newLine()
+    for (row <- rows) {
+      file.write(row.mkString(";"))
+      file.newLine()
+    }
+    file.close()
+  }
 
 }
