@@ -1,7 +1,9 @@
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.{Column, DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Dataset, Row, SparkSession}
 import org.apache.spark.sql.functions._
-import java.io.{BufferedWriter, FileWriter, File}
+
+import java.io.{BufferedWriter, File, FileWriter}
+import scala.collection.Seq
 
 object Main {
 
@@ -17,10 +19,13 @@ object Main {
     val (flightData, passengerData) = loadDataFrames(spark)
 
     //Question 1: Find the total number of flights for each month.
-    groupFlightsByDate(dataFrame = flightData, groupByFunction = month(col("date")), groupName = "Month")
+    groupFlightsByDate(dataFrame = flightData, groupByFunction = month(col("date")), groupName = "Month", sparkSession = spark)
 
     //Question 2: Find the names of the 100 most frequent flyers.
-    mostFrequentFlyers(df_passengers = passengerData, df_flights = flightData)
+    mostFrequentFlyers(df_passengers = passengerData, df_flights = flightData, sparkSession = spark)
+
+    //Question 3: Find the greatest number of countries a passenger has been in without being in the UK
+    longestCountriesWithoutUK(df_flights = flightData, sparkSession = spark)
 
     spark.stop()
   }
@@ -97,17 +102,17 @@ object Main {
    * @param dataFrame Dataset[FlightData] Dataset of flight data
    * @param groupByFunction Grouping function for the date column (month, year, day, etc.)
    * @param groupName Name of the group (e.g., ‘Month’, ‘Year’, etc.)
+   * @param sparkSession SparkSession to use for reading and writing data.
    * @return DataFrame with the total number of flights grouped by the selected criterion
    */
-  private def groupFlightsByDate(dataFrame: Dataset[FlightData], groupByFunction: => Column, groupName: String): Unit = {
+  private def groupFlightsByDate(dataFrame: Dataset[FlightData], groupByFunction: => Column, groupName: String, sparkSession: SparkSession): Unit = {
     val csvPath = "../question1.csv"
 
     val file = new File(csvPath)
 
     if (file.exists()) {
       println(s"CSV file '$csvPath' already exists. Loading data from CSV...")
-      val spark = SparkSession.builder().getOrCreate()
-      val loadedData = spark.read.option("header", "true").option("delimiter",";").csv(csvPath)
+      val loadedData = sparkSession.read.option("header", "true").option("delimiter",";").csv(csvPath)
       loadedData.show()
     } else {
       println(s"CSV file '$csvPath' does not exist. Generating and saving data...")
@@ -152,16 +157,16 @@ object Main {
    *
    * @param df_passengers Dataset[Passenger] containing passenger details (e.g., name, ID).
    * @param df_flights Dataset[FlightData] containing flight data including passenger IDs.
+   * @param sparkSession SparkSession to use for reading and writing data.
    */
-  private def mostFrequentFlyers(df_passengers: Dataset[Passenger], df_flights: Dataset[FlightData]): Unit = {
+  private def mostFrequentFlyers(df_passengers: Dataset[Passenger], df_flights: Dataset[FlightData], sparkSession: SparkSession): Unit = {
     val csvPath = "../question2.csv"
 
     val file = new File(csvPath)
 
     if (file.exists()) {
       println(s"CSV file '$csvPath' already exists. Loading data from CSV...")
-      val spark = SparkSession.builder().getOrCreate()
-      val loadedData = spark.read.option("header", "true").option("delimiter",";").csv(csvPath)
+      val loadedData = sparkSession.read.option("header", "true").option("delimiter",";").csv(csvPath)
       loadedData.show()
     } else {
       println(s"CSV file '$csvPath' does not exist. Generating and saving data...")
@@ -173,10 +178,67 @@ object Main {
         .join(df_passengers,"passengerId")
         .orderBy(desc("Number of Flights"))
 
-      saveDataFrameAsCSV(freq_flyers,"../question2.csv")
+      saveDataFrameAsCSV(freq_flyers,csvPath)
     }
 
   }
+
+  /**
+   * This method calculates the longest consecutive flight sequence for each passenger without visiting the UK
+   * and saves the result in a CSV file. If the CSV file already exists, it loads and displays the data from it.
+   *
+   * @param df_flights Dataset[FlightData] containing flight details for each passenger.
+   * @param sparkSession SparkSession to use for reading and writing data.
+   */
+  private def longestCountriesWithoutUK(df_flights: Dataset[FlightData], sparkSession: SparkSession):Unit  = {
+    val csvPath = "../question3.csv"
+
+    val file = new File(csvPath)
+
+    if (file.exists()) {
+      println(s"CSV file '$csvPath' already exists. Loading data from CSV...")
+      val loadedData = sparkSession.read.option("header", "true").option("delimiter",";").csv(csvPath)
+      loadedData.show()
+    } else {
+      println(s"CSV file '$csvPath' does not exist. Generating and saving data...")
+
+      //Make a column about if passenger was in Uk or not
+      val df_flights_involvesUk = df_flights.withColumn("involvesUk",
+        when(col("from") === "uk" || col("to") === "uk",1).otherwise(0))
+        .orderBy("date")
+
+      //Group by passenger and collect the flight information
+      val passenger_flights = df_flights_involvesUk.groupBy("passengerId")
+        .agg(collect_list(struct("from","to","date","involvesUk")).as("flights"))
+
+      val passengers_longestRun_RDD = passenger_flights.rdd.map( row => {
+        val passengerId = row.getAs[Int]("passengerId")
+        val flights = row.getAs[Seq[Row]]("flights")
+
+        var currentCount = 0
+        var maxCount: Int = 0
+
+        flights.foreach{ flight =>
+          val involvesUk = flight.getAs[Int]("involvesUk")
+          if (involvesUk == 0) {
+            currentCount += 1
+            if(currentCount > maxCount) maxCount = currentCount
+          }else
+            currentCount = 0
+        }
+
+        (passengerId, maxCount)
+
+      }
+      )
+
+      val passengers_longestRunDF = sparkSession.createDataFrame(passengers_longestRun_RDD)
+
+      saveDataFrameAsCSV(passengers_longestRunDF,csvPath)
+
+    }
+  }
+
 }
 
 
