@@ -31,7 +31,7 @@ object CSVUtils {
     validatePassengerData(passengerDataDF)
 
     // Casting rows & changing to typed datasets
-    println("Making typed datasets: flightData & passengerData...")
+    println("Typed datasets: flightData & passengerData")
     val flightData = flightDataDF
       .withColumn("passengerId", col("passengerId").cast("int"))
       .withColumn("flightId", col("flightId").cast("int"))
@@ -40,10 +40,6 @@ object CSVUtils {
     val passengerData = passengerDataDF
       .withColumn("passengerId", col("passengerId").cast("int"))
       .as[Passenger]
-
-    //Printing samples with a seed 1234
-    println("Taking a sample from flightData with seed 1234: " + flightData.rdd.takeSample(withReplacement = false, 1, 1234).mkString("(", ", ", ")"))
-    println("Taking a sample from passengerData with seed 1234: " + passengerData.rdd.takeSample(withReplacement = false, 1, 1234).mkString("(", ", ", ")"))
 
     // Return the datasets
     (flightData, passengerData)
