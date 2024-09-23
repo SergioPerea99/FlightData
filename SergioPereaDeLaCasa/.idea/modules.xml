@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/SergioPereaDeLaCasa.iml" filepath="$PROJECT_DIR$/.idea/modules/SergioPereaDeLaCasa.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/FlightDataAnalyzer.iml" filepath="$PROJECT_DIR$/.idea/modules/FlightDataAnalyzer.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/SergioPereaDeLaCasa.SergioPereaDeLaCasa-build.iml" filepath="$PROJECT_DIR$/.idea/modules/SergioPereaDeLaCasa.SergioPereaDeLaCasa-build.iml" />
     </modules>
   </component>

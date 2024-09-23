@@ -11,7 +11,7 @@ object Main {
     //Spark setup and load the DF
     manageSparkOutputs()
 
-    val spark = SparkSession.builder.appName("Flight Data Assignment").master("local").getOrCreate()
+    val spark = SparkSession.builder.appName("Flight Data Assignment").master("local[*]").getOrCreate()
 
     showComponentVersions(spark.version)
 
@@ -142,7 +142,7 @@ object Main {
       val passengerFlights = dfFlightsInvolvesUk.groupBy("passengerId")
         .agg(collect_list(struct("from", "to", "date", "involvesUk")).as("flights"))
 
-      val passengers_longestRun_RDD = passengerFlights.rdd.map(row => {
+      val passengersLongestRunRDD = passengerFlights.rdd.map(row => {
         val passengerId = row.getAs[Int]("passengerId")
         val flights = row.getAs[Seq[Row]]("flights")
 
@@ -167,9 +167,9 @@ object Main {
       }
       )
       import sparkSession.implicits._
-      val passengers_longestRunDF = passengers_longestRun_RDD.toDF("Passenger ID", "Longest Run")
-
-      CSVUtils.saveDataFrameAsCSV(passengers_longestRunDF, csvPath)
+      val passengersLongestRunDF = passengersLongestRunRDD.toDF("Passenger ID", "Longest Run")
+      val passengersOrderingLongestRun = passengersLongestRunDF.orderBy(desc("Longest Run"))
+      CSVUtils.saveDataFrameAsCSV(passengersOrderingLongestRun, csvPath)
 
     }
   }
@@ -212,8 +212,8 @@ object Main {
       })
       val reducedRDD = mapResult.reduceByKey((row1, row2) => row1).map(_._2)
       val reducedDataFrame = sparkSession.createDataFrame(reducedRDD,minFlightsTgtPassengers.schema)
-
-      CSVUtils.saveDataFrameAsCSV(reducedDataFrame, csvPath)
+      val reducedOrderingDF = reducedDataFrame.orderBy(desc("Number of flights together"))
+      CSVUtils.saveDataFrameAsCSV(reducedOrderingDF, csvPath)
     }
 
   }
@@ -262,8 +262,8 @@ object Main {
       })
       val reducedRDD = mapResult.reduceByKey((row1, row2) => row1).map(_._2)
       val reducedDataFrame = sparkSession.createDataFrame(reducedRDD,minFlightsTgtPassengers.schema)
-
-      CSVUtils.saveDataFrameAsCSV(reducedDataFrame, csvPath)
+      val reducedOrderingDF = reducedDataFrame.orderBy(desc("Number of flights together"))
+      CSVUtils.saveDataFrameAsCSV(reducedOrderingDF, csvPath)
 
     }
   }
