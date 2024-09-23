@@ -107,7 +107,7 @@ class FlightProcessingTest extends FunSuite {
     ).toDS()
 
     val csvPath = "../test/question4_2021-01-01_2021-02-01.csv"
-    Main.flownTogether(atLeastNTimes = 3, from = "2021-01-01", to = "2021-02-01", df_flights = flightData, sparkSession = spark, csvPath = csvPath)
+    Main.flownTogether(atLeastNTimes = 3, from = "2021-01-01", to = "2021-02-01", dfFlights = flightData, sparkSession = spark, csvPath = csvPath)
     val result = spark.read.option("header", "true").option("delimiter", ";").csv(csvPath)
     assert(result.count() == 1) // Only one pair should have flown together more than 3 times
 
