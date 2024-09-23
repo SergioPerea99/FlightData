@@ -168,6 +168,8 @@ Navigate to the directory where you cloned the repository and select the project
 
 IntelliJ will automatically detect the sbt project and begin indexing and resolving dependencies.
 
+Note: The project is stored in a folder with name "SergioPereaDeLaCasa". You must open this folder in IntelliJ as your main project.
+
 
 2. Running the Program
 To run the program in IntelliJ if the green Run button is not available:
@@ -190,11 +192,11 @@ After running the program, the following CSV files will be generated:
 
   
 
-- question2.csv: Contains the names and IDs of the top 100 most frequent flyers. Columns: passengerId, Number of Flights, name, age
+- question2.csv: Contains the names and IDs of the top 100 most frequent flyers. Columns: passengerId, Number of Flights, firstName, lastName
 
   
 
-- question3.csv: Contains the maximum number of countries a passenger has visited without being in the UK. Columns: passengerId, maxCountriesVisited
+- question3.csv: Contains the maximum number of countries a passenger has visited without being in the UK. Columns: passengerId, longest Run
 
   
 

@@ -21,20 +21,20 @@ object Main {
     groupFlightsByDate(dataFrame = flightData, groupByFunction = month(col("date")), groupName = "Month", sparkSession = spark, csvPath = "../question1.csv")
 
     //Question 2: Find the names of the 100 most frequent flyers.
-    mostFrequentFlyers(df_passengers = passengerData, df_flights = flightData, sparkSession = spark, csvPath = "../question2.csv")
+    mostFrequentFlyers(dfPassengers = passengerData, dfFlights = flightData, sparkSession = spark, csvPath = "../question2.csv")
 
     //Question 3: Find the greatest number of countries a passenger has been in without being in the UK.
-    longestCountriesWithoutUK(df_flights = flightData, sparkSession = spark, csvPath = "../question3.csv")
+    longestCountriesWithoutUK(dfFlights = flightData, sparkSession = spark, csvPath = "../question3.csv")
 
     //Question 4: Find the passengers who have been on more than 3 flights together.
-    numberFlightsTogether(df_flights = flightData, min_num_flights_tgt = 3, sparkSession = spark, csvPath = "../question4.csv")
+    numberFlightsTogether(dfFlights = flightData, minNumFlightsTgt = 3, sparkSession = spark, csvPath = "../question4.csv")
 
 
     //Extra: Find the passengers who have been on more than N flights together within the range (from,to).
-    val _from = "2017-01-01"
-    val _to = "2017-02-01"
-    val csvPath = "../question4_"+_from+"_"+_to+".csv"
-    flownTogether(atLeastNTimes = 5, from = _from, to = _to, df_flights = flightData, sparkSession = spark, csvPath = csvPath)
+    val fromDate = "2017-01-01"
+    val toDate = "2017-02-01"
+    val csvPath = "../question4_"+fromDate+"_"+toDate+".csv"
+    flownTogether(atLeastNTimes = 5, from = fromDate, to = toDate, dfFlights = flightData, sparkSession = spark, csvPath = csvPath)
 
     spark.stop()
   }
@@ -100,20 +100,20 @@ object Main {
    * joined with the passenger dataset to enrich the data with passenger details, and finally, the top
    * 100 frequent flyers are saved to a CSV file.
    *
-   * @param df_passengers Dataset[Passenger] containing passenger details (e.g., name, ID).
-   * @param df_flights    Dataset[FlightData] containing flight data including passenger IDs.
+   * @param dfPassengers Dataset[Passenger] containing passenger details (e.g., name, ID).
+   * @param dfFlights    Dataset[FlightData] containing flight data including passenger IDs.
    * @param sparkSession  SparkSession to use for reading and writing data.
    * @param csvPath       Path to the CSV file where the result will be saved or loaded from.
    */
-  def mostFrequentFlyers(df_passengers: Dataset[Passenger], df_flights: Dataset[FlightData], sparkSession: SparkSession, csvPath: String): Unit = {
+  def mostFrequentFlyers(dfPassengers: Dataset[Passenger], dfFlights: Dataset[FlightData], sparkSession: SparkSession, csvPath: String): Unit = {
     if (!CSVUtils.checkAndLoadCSV(csvPath = csvPath, sparkSession = sparkSession)) {
       println(s"CSV file '$csvPath' does not exist. Generating and saving data...")
 
-      val freq_flyers = df_flights.groupBy("passengerId")
+      val freq_flyers = dfFlights.groupBy("passengerId")
         .agg(count("flightId").as("Number of Flights"))
         .orderBy(desc("Number of Flights"))
         .limit(100)
-        .join(df_passengers, "passengerId")
+        .join(dfPassengers, "passengerId")
         .orderBy(desc("Number of Flights"))
 
       CSVUtils.saveDataFrameAsCSV(freq_flyers, csvPath)
@@ -125,24 +125,24 @@ object Main {
    * This method calculates the longest consecutive flight sequence for each passenger without visiting the UK
    * and saves the result in a CSV file. If the CSV file already exists, it loads and displays the data from it.
    *
-   * @param df_flights   Dataset[FlightData] containing flight details for each passenger.
+   * @param dfFlights   Dataset[FlightData] containing flight details for each passenger.
    * @param sparkSession SparkSession to use for reading and writing data.
    * @param csvPath      Path to the CSV file where the result will be saved or loaded from.
    */
-  def longestCountriesWithoutUK(df_flights: Dataset[FlightData], sparkSession: SparkSession, csvPath: String): Unit = {
+  def longestCountriesWithoutUK(dfFlights: Dataset[FlightData], sparkSession: SparkSession, csvPath: String): Unit = {
     if (!CSVUtils.checkAndLoadCSV(csvPath = csvPath, sparkSession = sparkSession)) {
       println(s"CSV file '$csvPath' does not exist. Generating and saving data...")
 
       //Make a column about if passenger was in Uk or not
-      val df_flights_involvesUk = df_flights.withColumn("involvesUk",
+      val dfFlightsInvolvesUk = dfFlights.withColumn("involvesUk",
           when(col("from") === "uk" || col("to") === "uk", 1).otherwise(0))
         .orderBy("date")
 
       //Group by passenger and collect the flight information
-      val passenger_flights = df_flights_involvesUk.groupBy("passengerId")
+      val passengerFlights = dfFlightsInvolvesUk.groupBy("passengerId")
         .agg(collect_list(struct("from", "to", "date", "involvesUk")).as("flights"))
 
-      val passengers_longestRun_RDD = passenger_flights.rdd.map(row => {
+      val passengers_longestRun_RDD = passengerFlights.rdd.map(row => {
         val passengerId = row.getAs[Int]("passengerId")
         val flights = row.getAs[Seq[Row]]("flights")
 
@@ -178,17 +178,16 @@ object Main {
    * This method calculates the number of flights where two passengers have been together and saves the result in a CSV file.
    * If the CSV file already exists, it will be loaded and displayed. If it doesn't exist, the data will be processed and saved.
    *
-   * @param df_flights          Dataset[FlightData] containing flight data for each passenger.
-   * @param min_num_flights_tgt Minimum number of flights two passengers must have been together to be included in the result.
+   * @param dfFlights           Dataset[FlightData] containing flight data for each passenger.
+   * @param minNumFlightsTgt    Minimum number of flights two passengers must have been together to be included in the result.
    * @param sparkSession        SparkSession for Spark operations.
    * @param csvPath             Path to the CSV file where the result will be saved or loaded from.
    */
-  def numberFlightsTogether(df_flights: Dataset[FlightData], min_num_flights_tgt: Int, sparkSession: SparkSession, csvPath: String): Unit = {
+  def numberFlightsTogether(dfFlights: Dataset[FlightData], minNumFlightsTgt: Int, sparkSession: SparkSession, csvPath: String): Unit = {
     if (!CSVUtils.checkAndLoadCSV(csvPath = csvPath, sparkSession = sparkSession)) {
       println(s"CSV file '$csvPath' does not exist. Generating and saving data...")
 
-      //Collect all the passengers for each flight Id
-      val groupedFlightsId = df_flights.groupBy("flightId")
+      val groupedFlightsId = dfFlights.groupBy("flightId")
         .agg(collect_set("passengerId").as("passengers"))
 
       //Make rows for each passenger-passenger that they have been in the same flight AND clean with same passengerIds
@@ -200,7 +199,7 @@ object Main {
       //Group by both passengerIds and count them (Delete less than min_flights_together).
       val minFlightsTgtPassengers = passengerPairs.groupBy("Passenger1 ID", "Passenger2 ID")
         .agg(countDistinct("flightId").as("Number of flights together"))
-        .filter(col("Number of flights together") > min_num_flights_tgt)
+        .filter(col("Number of flights together") > minNumFlightsTgt)
 
 
       //Ordering columns Passenger1 ID & Passenger2 ID and reduce by key to take the unique rows.
@@ -230,16 +229,16 @@ object Main {
    * @param atLeastNTimes The minimum number of times two passengers must have flown together to be included in the result.
    * @param from          Start date of the date range for filtering flights.
    * @param to            End date of the date range for filtering flights.
-   * @param df_flights    Dataset[FlightData] containing flight data, including flight IDs and passenger IDs.
+   * @param dfFlights    Dataset[FlightData] containing flight data, including flight IDs and passenger IDs.
    * @param sparkSession  SparkSession to be used for performing operations in Spark.
    * @param csvPath       Path to the CSV file where the result will be saved or loaded from.
    */
-  def flownTogether(atLeastNTimes: Int, from: String, to: String, df_flights: Dataset[FlightData], sparkSession: SparkSession, csvPath : String): Unit = {
+  def flownTogether(atLeastNTimes: Int, from: String, to: String, dfFlights: Dataset[FlightData], sparkSession: SparkSession, csvPath : String): Unit = {
 
     if (!CSVUtils.checkAndLoadCSV(csvPath = csvPath, sparkSession = sparkSession)) {
       println(s"CSV file '$csvPath' does not exist. Generating and saving data...")
 
-      val groupedFlightsId = df_flights.filter(col("date") >= from && col("date") <= to)
+      val groupedFlightsId = dfFlights.filter(col("date") >= from && col("date") <= to)
         .groupBy("flightId")
         .agg(collect_set("passengerId").as("passengers"), first(col("date")).as("flightDate"))
 

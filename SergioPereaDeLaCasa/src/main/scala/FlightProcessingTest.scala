@@ -43,8 +43,8 @@ class FlightProcessingTest extends FunSuite {
 
     // Load the CSV and verify the number of rows
     val result = spark.read.option("header", "true").option("delimiter", ";").csv("../test/question2.csv")
-    assert(result.filter($"passengerId" === 1).count() == 1)
-    assert(result.filter($"Number of Flights" === 4).count() == 1)
+    assert(result.filter($"passengerId" === 1).count() == 1) //PassengerId: 1
+    assert(result.filter($"Number of Flights" === 4).count() == 1) //Find the max number of flights for passengers: 4
   }
 
 
